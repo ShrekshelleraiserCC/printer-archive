@@ -6,6 +6,7 @@ local config = {
   paperOutName="", -- name of the paper output hopper
   speakerName="", -- name of speaker to play sound effects on (optional)
   hostname="printer", -- hostname of the printer on rednet
+  oldCC=false, -- use the old names for dyes
 }
 
 local printerPer
@@ -16,12 +17,14 @@ local paperOutPer
 local speakerPer
 
 --- takes an inventory peripehral, and item name, returns slot in chest or false
-local function findItem(per, name, fuzzy)
+local function findItem(per, name, fuzzy, damage)
   local items = per.list()
   fuzzy = fuzzy or false
   for slot, item in pairs(items) do
-    if item and (item.name == name) and not fuzzy then
-      return slot
+    if item and (item.name == name) then
+      if (not damage) or (item.damage == damage) then
+        return slot
+      end
     elseif item and string.match(item.name, name) then
       return slot -- fuzzy
     end
@@ -88,13 +91,19 @@ local supplyNameLookup = {
   "minecraft:red_dye",
   "minecraft:black_dye",
 }
+
 -- returns boolean of success
 local function addDye(n)
   local dyeCol = tonumber(n,16)
   assert(dyeCol, "Invalid dye character")
   assert(dyeCol >= 0 and dyeCol <= 15, "Invalid dye color")
   local inv = listTurtleInv()
-  local slot = findItem(supplyPer, supplyNameLookup[dyeCol])
+  local slot
+  if config.oldCC then
+    slot = findItem(supplyPer, "minecraft:dye", nil, 15-dyeCol) -- dye damage values are inverted for some reason
+  else
+    slot = findItem(supplyPer, supplyNameLookup[dyeCol])
+  end
   if slot then
     supplyPer.pushItems(config.belowName,slot,1)
     turtle.select(1)
@@ -117,7 +126,13 @@ end
 
 -- returns a boolean of success
 local function cyclePage()
-  return (paperOutPer.pushItems(config.paperName, 1, 1) > 0)
+  local i = 0
+  local count = 0
+  while i < 3 and count == 0 do
+    i = i + 1
+    count = paperOutPer.pushItems(config.paperName, 1, 1) -- attempt to compensate for lag
+  end
+  return (count > 0)
 end
 
 -- c is a color character
