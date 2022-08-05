@@ -39,3 +39,14 @@ You won't recieve a response back until the document is printed, the response yo
 The printer also makes some information available.
 * You can request the ink levels of the printer by just sending the string `getDyeCount`, the printer will respond with a [0-15] indexed table of counts.
 * You can request the paper level of the printer by sending the string `getPaperCount`, the printer will respond with a number.
+
+## Notes
+
+The printer is very prone to jamming. To clear a jam empty:
+* The input hopper above the printer
+* The printer
+* The output hopper below the printer
+* The turtle
+* The chest underneath the turtle
+
+Jams are often caused by a print failing partway through.
