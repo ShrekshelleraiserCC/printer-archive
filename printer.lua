@@ -40,22 +40,6 @@ local function countItem(per, name)
   return count
 end
 
--- move the printer's contents into the turtle
-local function emptyPrinter()
-  local i = 1
-  while turtle.suck() do
-    i = i + 1
-    if i > 13 then
-      break -- hopper protection
-    end
-  end
-end
-
--- Move above chest contents into turtle
-local function fillTurtle()
-  while turtle.suckDown() do end
-end
-
 -- move turtle's contents into chest
 local function emptyTurtle()
   for i = 1, 16 do
@@ -74,25 +58,18 @@ local function listTurtleInv()
   return retVal
 end
 
--- move the turtle and bottom chests' inventory contents into the printer (and paper storage, and output)
--- if dye is in the bottom chest, it's returned to the dye storage chest
--- if some dye is in the turtle, it'll be moved into the printer, the rest moved into the dye storage chest
-local function fillPrinter()
-  local slot = findItem({list=listTurtleInv},"dye",true)
-  if slot then
-    -- this is dye
-    turtle.select(slot)
-    turtle.drop()
-  end
-  emptyTurtle()
+-- move the inventory contents of all hoppers, chests, printer, and the turtle into the resource chest
+local function clearJam()
+  while turtle.suck() do end -- empty the printer
+  emptyTurtle() -- move turtles inventory into chest below
   for s, item in pairs(belowPer.list()) do
-    if item.name == "minecraft:paper" then
-      belowPer.pushItems(config.paperName, s)
-    else
-      belowPer.pushItems(config.paperName, s)
-    end
+    belowPer.pushItems(config.supplyName, s) -- move the contents of the below chest to the supply chest
+  end
+  for s, item in pairs(paperOutPer.list()) do
+    paperOutPer.pushItems(config.outputName, s) -- move the contents of the output hopper to the output chest
   end
 end
+
 local supplyNameLookup = {
   [0] = "minecraft:white_dye",
   "minecraft:orange_dye",
@@ -119,7 +96,6 @@ local function addDye(n)
   local inv = listTurtleInv()
   local slot = findItem(supplyPer, supplyNameLookup[dyeCol])
   if slot then
-    -- fillPrinter() -- reset chest status
     supplyPer.pushItems(config.belowName,slot,1)
     turtle.select(1)
     turtle.suckDown()
@@ -353,12 +329,14 @@ end
 local function doPrinting()
   while true do
     if #printQueue > 0 then
+      clearJam() -- ensure there is nothing in the printer
       -- something to do
       print("Attempting print")
       local doc = popFromQueue()
       local stat, info = pcall(processInput, doc[2].job, doc[2].color)
       if stat then
-        stat, info = pcall(printDocument, info, doc[2].title)
+        ---@diagnostic disable-next-line: cast-local-type
+        stat, info = pcall(printDocument, info, doc[2].title or "Untitled")
         rednet.send(doc[1], {stat, info})
         if not stat then
           print("Print failed",info)
@@ -377,6 +355,7 @@ end
 
 local function main()
   print("started")
+  clearJam()
   parallel.waitForAll(handleMessages, doPrinting)
 end
 
@@ -388,12 +367,6 @@ local function loadConfig()
     -- config file exists
     config = assert(textutils.unserialize(f.readAll()), "printer.conf is invalid")
     printerPer = assert(peripheral.wrap("front"), "there should be a printer in front of the turtle")
-    printerPer.list = function()
-      emptyPrinter()
-      local retVal = listTurtleInv()
-      fillPrinter()
-      return retVal
-    end
     supplyPer = assert(peripheral.wrap(config.supplyName), "supplyName is not a peripheral")
     outputPer = assert(peripheral.wrap(config.outputName), "outputName is not a peripheral")
     belowPer = assert(peripheral.wrap(config.belowName), "belowName is not a peripheral")
